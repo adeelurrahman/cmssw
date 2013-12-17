@@ -148,12 +148,17 @@ class TestRunner(Thread):
                     l.write('%s: Exit status different from 0, quitting. Status: %d' % (time.ctime(time.time()), status) )
                     l.write('\n')
                     l.close()
-                    f = open(self.cwd+'/'+self.testNumber+'_Failed.log', 'w')
+		    ## Creating <test_number>_Failed.log file to the appropriate sub-directory in order to be able to get visible on Jenkins portal
+		    ## f = open(self.cwd+'/'+self.testNumber+'_Failed.log', 'w')
+		    f = open(wdir+'_Failed.log', 'w')	
                     f.write('\n')
                     f.close()
+	
                     return
             l.close()
-        f = open(self.cwd+'/'+self.testNumber+'_OK.log', 'w')
+	## Creating <test_number>_OK.log file to the appropriate sub-directory in order to be able to get visible on Jenkins portal
+	## f = open(self.cwd+'/'+self.testNumber+'_OK.log', 'w')
+	f = open(wdir+'_OK.log', 'w')
         xmls = glob.glob('%s/*.xml' % wdir)
         #xmls = commands.getoutput('ls -1tr %s/*.xml' % wdir ).split('\n')
         output = commands.getoutput('eval `scramv1 runtime -sh` && showtags -r | grep "^V"').split('\n')
@@ -163,7 +168,9 @@ class TestRunner(Thread):
             if len(fields) >  1:
                 testPackages += "{'package': '%s', 'current':'%s', 'base':'%s'}," %(fields[2], fields[0], fields[1])
         for single in xmls:
+	    ## Creating <test_number>_MemoryChanged.log file to the appropriate sub-directory in order to be able to get visible on Jenkins portal	
             filename = "%s/%s" %(self.cwd, single.split('/')[-1])
+	    #filename = "%s/%s" %(self.cwd+ '/' + self.timestamp, single.split('/')[-1])	
             print 'Analyzing %s' % single
             fwjr = FWJRParser(single)
             resRun = fwjr.getReport(FWJRParser.Run)
@@ -194,18 +201,22 @@ class TestRunner(Thread):
                             
         f.write('\n')
         f.close()
+
         return
 
     def checkMemAgainstRef(self, subsys, type, ref, res, filename):
         if res != ref:
             apath = '/'+'/'.join(filename.split('/')[1:-1])
-            repFile = '%s/%s_MemoryChanged.log' % (apath,filename.split('/')[-1].split('_')[1])
+          #  repFile = '%s/%s_MemoryChanged.log' % (apath,filename.split('/')[-1].split('_')[1])
+	    repFile = '%s/%s_MemoryChanged.log' % (apath+'/'+self.timestamp,filename.split('/')[-1].split('_')[1])	
             repLog = open(repFile,'a')
             if res > ref:
                 repLog.write('%s FAILS on %s: Reference %f, current %f, diff %f\n' % (subsys, type, ref, res, (res-ref)))
             else:
                 repLog.write('%s GAINS on %s: Reference %f, current %f, diff %f\n' % (subsys, type, ref, res, (ref-res)))
             repLog.close()
+	
+	    	
         
 
 class TestOptionParser:
@@ -389,7 +400,10 @@ if __name__ == '__main__':
         while tm.activeThreads() > 0 :
             time.sleep(10)
 
-        mailFile = '%s/%s' %  (cwd,'MailMessage.txt')
+	## Creating MailMessage.txt to the appropriate sub-directory in order to be able to get visible on Jenkins portal	
+        #mailFile = '%s/%s' %  (cwd,'MailMessage.txt')
+	ts_str = str(ts)
+	mailFile = '%s/%s' %  (cwd+'/'+ts_str,'MailMessage.txt')
         f = open(mailFile, 'w')
 
         # Now append tags information
@@ -403,10 +417,12 @@ if __name__ == '__main__':
                 ff.close()
 
         # Now parse all log files, showtags info and send around 1 gigantic email...
-        print "Assembling final report on %s" % cwd
+	print "Assembling final report on %s" % cwd+'/'+ts_str 
+        ##print "Assembling final report on %s" % cwd
         if os.path.exists('%s' % cwd ):
             putAtTheEnd = ''
-            command = 'find %s/*log -cnewer %s/%d | sort -n -k 1 -t _' % (cwd, cwd, ts)
+            #command = 'find %s/*log -cnewer %s/%d | sort -n -k 1 -t _' % (cwd+'/'+ts_str, cwd, ts)
+   	    command = 'find %s/*log -cnewer %s | sort -n -k 1 -t _' % (cwd+'/'+ts_str, cwd)			
             print 'Running command %s' % command
             logs = commands.getoutput(command).split('\n')
             for l in logs:
@@ -430,8 +446,12 @@ if __name__ == '__main__':
                 ff.close()
             f.write(putAtTheEnd)
         f.close()
+	
+
+
         if not parser.noMail():
             send_mail(mailFile)
-    except:
+    except Exception, e:
+	print "Exception Caught with Message: ",e.message
         print "Error executing whiteRabbit.py: exiting."
         sys.exit(1)
